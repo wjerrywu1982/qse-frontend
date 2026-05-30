@@ -79,6 +79,7 @@
         </div>
     </div>
 
+    <div id="aggregate-report-container"></div>
     <div id="dynamic-reports-container">
         <div class="empty-placeholder" id="initial-empty-state" style="padding: 100px 20px; font-size: 18px; border: 2px dashed #cbd5e1; border-radius: 12px; background-color: #ffffff;">
             🗙 暫無分析數據。<br><span style="font-size: 14px; color: #64748b;">請上傳 PDF 檔案並點擊開始分析，系統將為您擷取報告數值並同步查詢台股最新報價。</span>
@@ -88,6 +89,23 @@
 
 <script>
     let uploadedFilesCount = 0;
+
+    window.recalculateAggPrices = function(inputElem) {
+        const pct = parseFloat(inputElem.value) || 0;
+        const multiplier = 1 + (pct / 100);
+        
+        const cells = document.querySelectorAll('.calc-val-agg');
+        cells.forEach(cell => {
+            const rawPrice = cell.getAttribute('data-price');
+            if (rawPrice && !isNaN(rawPrice)) {
+                const newPrice = parseFloat(rawPrice) * multiplier;
+                cell.innerText = `$${newPrice.toFixed(2)}`;
+            } else {
+                cell.innerText = "-";
+            }
+        });
+    };
+
 
     // A helper function to recalculate the estimated price column
     window.recalculatePrices = function(inputElem, filename) {
@@ -159,6 +177,80 @@
                 });
 
                 reportsContainer.innerHTML = '';
+
+                const aggContainer = document.getElementById('aggregate-report-container');
+                if(aggContainer) aggContainer.innerHTML = '';
+                
+                const fileCount = Object.keys(groupedData).length;
+                if (fileCount > 1 && aggContainer) {
+                    const aggMap = {};
+                    realData.forEach(item => {
+                        if (item.high_val_count > 0) {
+                            if (!aggMap[item.name]) {
+                                aggMap[item.name] = { name: item.name, price: item.price, total_high: 0, total_avg: 0, count: 0 };
+                            }
+                            aggMap[item.name].total_high += item.high_val_count;
+                            aggMap[item.name].total_avg += item.avg;
+                            aggMap[item.name].count += 1;
+                        }
+                    });
+                    
+                    const aggList = Object.values(aggMap)
+                        .filter(item => item.total_high > 0)
+                        .sort((a, b) => b.total_high !== a.total_high ? b.total_high - a.total_high : (b.total_avg/b.count) - (a.total_avg/a.count))
+                        .slice(0, 10);
+                        
+                    if (aggList.length > 0) {
+                        const formatPrice = (price) => {
+                            if (price === "需補代碼" || price === "查詢失敗" || price === "暫無報價") return `<span class="price-na">${price}</span>`;
+                            return `<span class="price-badge">$${price}</span>`;
+                        };
+                        
+                        let aggRows = '';
+                        aggList.forEach((item, i) => {
+                            let rankIcon = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+                            let projectedStr = "-";
+                            if (!isNaN(item.price)) {
+                                let calcVal = parseFloat(item.price) * 1.10;
+                                projectedStr = `$${calcVal.toFixed(2)}`;
+                            }
+                            aggRows += `
+                                <tr>
+                                    <td style="padding: 12px; border-bottom: 1px solid #fcd34d; font-weight: bold; color: #b45309; text-align: center; font-size: 16px;">${rankIcon}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #fcd34d; font-weight: bold; color: #0f172a; font-size: 15px;">${item.name} <br><div style="margin-top:4px;">${formatPrice(item.price)}</div></td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #fcd34d; text-align: center;"><span style="background-color: #f59e0b; color: white; padding: 4px 12px; border-radius: 12px; font-weight: bold; font-size: 15px;">${item.total_high} 次</span></td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #fcd34d; text-align: right; color: #b91c1c; font-weight: 800; font-size: 15px;" class="calc-val-agg" data-price="${item.price}">${projectedStr}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        aggContainer.innerHTML = `
+                        <div class="report-section" style="border: 2px solid #fbbf24; background-color: #fffbeb; border-radius: 12px; padding: 25px; margin-bottom: 40px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.15);">
+                            <div style="text-align: center; margin-bottom: 25px;">
+                                <div style="display: inline-block; background-color: #f59e0b; color: #fff; padding: 10px 25px; border-radius: 8px; font-size: 20px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    👑 多檔報告綜合總冠軍 (Top 10) 
+                                </div>
+                                <div style="color: #b45309; margin-top: 8px; font-weight: bold;">統計範圍：本次上傳的 ${fileCount} 份報告加總</div>
+                            </div>
+                            <table class="ranking-table" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background-color: #fef3c7;">
+                                        <th style="width: 15%; text-align: center; color: #b45309; padding: 12px; border-bottom: 2px solid #fcd34d;">總排名</th>
+                                        <th style="width: 35%; color: #b45309; padding: 12px; border-bottom: 2px solid #fcd34d;">標的與最新報價</th>
+                                        <th style="width: 25%; text-align: center; color: #b45309; padding: 12px; border-bottom: 2px solid #fcd34d;">總計破 5 次數</th>
+                                        <th style="width: 25%; text-align: right; color: #b45309; padding: 12px; border-bottom: 2px solid #fcd34d;">
+                                            <div style="font-size: 11px; color:#92400e; margin-bottom:2px;">預估目標價</div>
+                                            漲幅 <input type="number" value="10" step="1" onchange="recalculateAggPrices(this)" style="width:45px; text-align:center; padding:2px; font-weight:bold; color:#b91c1c; border:1px solid #fcd34d; border-radius:4px; font-size:13px; outline:none; background:#fff;"> %
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>${aggRows}</tbody>
+                            </table>
+                        </div>
+                        `;
+                    }
+                }
+
                 let reportCount = 1;
                 
                 for (const [filename, fileData] of Object.entries(groupedData)) {
