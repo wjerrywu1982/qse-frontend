@@ -163,15 +163,6 @@
 
         try {
             const response = await fetch("https://qsesa.zeabur.app/api/analyze", { method: "POST", body: formData });
-            
-            if (!response.ok) {
-                if (response.status === 502 || response.status === 504) {
-                    throw new Error("伺服器正在喚醒中 (冷啟動)，請等待 30 秒後再試一次！");
-                } else {
-                    throw new Error(`伺服器發生錯誤 (狀態碼: ${response.status})，請檢查後端日誌。`);
-                }
-            }
-            
             const result = await response.json();
             
             if (result.status === "success") {
@@ -394,17 +385,7 @@
                 }
                 btn.innerText = `分析完成 (共 ${reportCount-1} 份)`; btn.style.backgroundColor = '#10b981';
             } else { alert("解析失敗"); btn.innerText = '分析失敗，請重試'; btn.style.backgroundColor = '#ef4444'; }
-        } catch (error) { 
-            console.error(error);
-            if (error.message && (error.message.includes("喚醒中") || error.message.includes("伺服器發生錯誤"))) {
-                alert(error.message);
-            } else {
-                alert("連線或解析失敗！
-可能是伺服器正在賴床，請等 30 秒後再按一次開始分析。
-(若持續失敗請確認 Python 伺服器狀態)"); 
-            }
-            btn.innerText = '連線失敗'; btn.style.backgroundColor = '#ef4444'; 
-        } 
+        } catch (error) { alert("連線失敗！請確認 Python 伺服器正在運行"); btn.innerText = '連線失敗'; btn.style.backgroundColor = '#ef4444'; } 
         finally { globalSpinner.style.display = 'none'; setTimeout(() => { btn.disabled = false; btn.innerText = '重新選擇並分析'; }, 2000); }
     });
 </script>
