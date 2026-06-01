@@ -396,7 +396,7 @@
             } else { alert("解析失敗"); btn.innerText = '分析失敗，請重試'; btn.style.backgroundColor = '#ef4444'; }
         } catch (error) { 
             console.error(error);
-            if (error.message.includes("喚醒中") || error.message.includes("伺服器發生錯誤")) {
+            if (error.message && (error.message.includes("喚醒中") || error.message.includes("伺服器發生錯誤"))) {
                 alert(error.message);
             } else {
                 alert("連線或解析失敗！
